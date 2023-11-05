@@ -1,0 +1,12 @@
+[
+    {
+        "url": "https://www.releases.ubuntu.com/",
+        "interval": 10,
+        "regexp_pattern": "mantic"
+    },
+    {
+        "url": "https://archives.fedoraproject.org/pub/fedora/linux/releases/",
+        "interval": 20,
+        "regexp_pattern": "38"
+    }
+]

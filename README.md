@@ -4,7 +4,7 @@ A program that monitors the availability of many websites over the network, prod
 the metrics into a PostgreSQL database.
 
 ## TODO
-- [ ] Read from file
+- [x] Read from file
 - [ ] Store webpage content found by regexp
 - [ ] Extract DB interaction
 - [ ] Add tests

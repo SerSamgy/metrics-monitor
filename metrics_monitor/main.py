@@ -1,29 +1,32 @@
+import argparse
 import asyncio
+import json
 import logging
 import os
 import re
 from datetime import datetime
+from typing import TextIO
 
 import aiohttp
 import asyncpg
 from dotenv import load_dotenv
 
 load_dotenv()
-websites = [
-    {
-        "url": "https://google.com",
-        "interval": 30,
-        "regexp_pattern": "About",
-    },
-    {
-        "url": "https://duckduckgo.com",
-        "interval": 40,
-        "regexp_pattern": "Privacy, simplified",
-    },
-]
 
 
-async def check_website(url, interval, regexp_pattern, conn):
+async def check_website(
+    url: str, interval: int, regexp_pattern: str, conn: asyncpg.Connection
+):
+    """
+    Check the given website at a specified interval and log the response time, status code, and whether a given regular
+    expression pattern was found in the response content.
+
+    Args:
+        url (str): The URL of the website to check.
+        interval (int): The interval, in seconds, at which to check the website.
+        regexp_pattern (str): The regular expression pattern to search for in the response content.
+        conn (asyncpg.Connection): The connection to the database where website metrics will be stored.
+    """
     while True:
         try:
             async with aiohttp.ClientSession() as session:
@@ -57,7 +60,19 @@ async def check_website(url, interval, regexp_pattern, conn):
         await asyncio.sleep(interval)
 
 
-async def main():
+async def main(input_file: TextIO):
+    """
+    Asynchronously monitors website metrics by periodically sending HTTP requests to specified URLs and storing the
+    response time, status code, and whether a specified pattern was found in the response. The monitoring parameters
+    are read from a JSON file passed as an argument.
+
+    :param input_file: A file-like object containing a JSON array of monitoring parameters. Each parameter is a JSON
+                       object with the following keys:
+                       - url: The URL to monitor
+                       - interval: The interval between requests in seconds
+                       - regexp_pattern: A regular expression pattern to search for in the response body
+    """
+
     pg_user = os.environ.get("POSTGRES_USER")
     pg_password = os.environ.get("POSTGRES_PASSWORD")
     pg_host = os.environ.get("POSTGRES_HOST")
@@ -71,13 +86,13 @@ async def main():
     )
 
     tasks = []
-
-    for website in websites:
+    monitoring_args = json.load(input_file)
+    for args in monitoring_args:
         tasks.append(
             check_website(
-                website["url"],
-                website["interval"],
-                website["regexp_pattern"],
+                args["url"],
+                args["interval"],
+                args["regexp_pattern"],
                 conn,
             )
         )
@@ -85,6 +100,11 @@ async def main():
     await asyncio.gather(*tasks)
 
 
-if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
-    asyncio.run(main())
+parser = argparse.ArgumentParser()
+parser.add_argument(
+    "config", type=argparse.FileType("r"), help="config file with monitoring args"
+)
+args = parser.parse_args()
+
+logging.basicConfig(level=logging.INFO)
+asyncio.run(main(args.config))

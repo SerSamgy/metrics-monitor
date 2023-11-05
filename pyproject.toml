@@ -12,7 +12,11 @@ aiohttp = {version = "^3.8.6", extras = ["speedups"]}
 asyncpg = "^0.29.0"
 python-dotenv = "^1.0.0"
 
-
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.ruff]
+line-length = 120
+indent-width = 4
+target-version = "py311"
