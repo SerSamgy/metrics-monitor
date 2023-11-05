@@ -11,6 +11,8 @@ import aiohttp
 import asyncpg
 from dotenv import load_dotenv
 
+from metrics_monitor.db_operations import create_table, get_db_connection, save_metrics
+
 load_dotenv()
 
 
@@ -63,39 +65,6 @@ async def check_website(
         await asyncio.sleep(interval)
 
 
-async def save_metrics(
-    url: str,
-    request_timestamp: datetime,
-    response_time: float,
-    status_code: int,
-    pattern_found: bool,
-    conn: asyncpg.Connection,
-):
-    """
-    Saves website metrics to the database.
-
-    Args:
-        url (str): The URL of the website.
-        request_timestamp (datetime): The timestamp of the request.
-        response_time (float): The response time of the request.
-        status_code (int): The HTTP status code of the response.
-        pattern_found (bool): Whether the expected pattern was found in the response.
-        conn (asyncpg.Connection): The database connection.
-
-    Returns:
-        None
-    """
-    await conn.execute(
-        """INSERT INTO website_metrics (url, request_timestamp, response_time, status_code, pattern_found) 
-        VALUES ($1, $2, $3, $4, $5)""",
-        url,
-        request_timestamp,
-        response_time,
-        status_code,
-        pattern_found,
-    )
-
-
 async def main(input_file: TextIO):
     """
     Asynchronously monitors website metrics by periodically sending HTTP requests to specified URLs and storing the
@@ -115,18 +84,7 @@ async def main(input_file: TextIO):
 
     conn = await get_db_connection()
 
-    await conn.execute(
-        """
-        CREATE TABLE IF NOT EXISTS website_metrics (
-            id serial primary key,
-            url text,
-            request_timestamp timestamptz,
-            response_time float,
-            status_code int,
-            pattern_found boolean
-        )
-        """
-    )
+    await create_table(conn)
 
     tasks = []
     monitoring_args = json.load(input_file)
@@ -143,23 +101,6 @@ async def main(input_file: TextIO):
     await asyncio.gather(*tasks)
 
     await conn.close()
-
-
-async def get_db_connection() -> asyncpg.Connection:
-    """
-    Get a connection to the database where website metrics will be stored.
-
-    Returns:
-        asyncpg.Connection: The connection to the database where website metrics will be stored.
-    """
-    pg_user = os.environ.get("POSTGRES_USER")
-    pg_password = os.environ.get("POSTGRES_PASSWORD")
-    pg_host = os.environ.get("POSTGRES_HOST")
-    pg_port = os.environ.get("POSTGRES_PORT")
-    pg_database = os.environ.get("POSTGRES_DATABASE")
-    dsn = f"postgresql://{pg_user}:{pg_password}@{pg_host}:{pg_port}/{pg_database}"
-
-    return await asyncpg.connect(dsn)
 
 
 parser = argparse.ArgumentParser()
