@@ -107,4 +107,11 @@ parser.add_argument(
 args = parser.parse_args()
 
 logging.basicConfig(level=logging.INFO)
-asyncio.run(main(args.config))
+try:
+    asyncio.run(main(args.config))
+except KeyboardInterrupt:
+    print("Keyboard interrupt detected.")
+except Exception as e:
+    print(f"Error: {str(e)}")
+finally:
+    print("Exiting...")
