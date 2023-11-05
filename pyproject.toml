@@ -1,0 +1,15 @@
+[tool.poetry]
+name = "metrics-monitor"
+version = "0.1.0"
+description = ""
+authors = ["SerSamgy <samgy7cool@gmail.com>"]
+readme = "README.md"
+packages = [{include = "metrics_monitor"}]
+
+[tool.poetry.dependencies]
+python = "^3.12"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
