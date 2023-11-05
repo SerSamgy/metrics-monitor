@@ -7,7 +7,10 @@ readme = "README.md"
 packages = [{include = "metrics_monitor"}]
 
 [tool.poetry.dependencies]
-python = "^3.12"
+python = "^3.11"
+aiohttp = {version = "^3.8.6", extras = ["speedups"]}
+asyncpg = "^0.29.0"
+python-dotenv = "^1.0.0"
 
 
 [build-system]
