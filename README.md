@@ -6,7 +6,7 @@ the metrics into a PostgreSQL database.
 ## TODO
 - [x] Read from file
 - [ ] Store webpage content found by regexp
-- [ ] Extract DB interaction
+- [x] Extract DB interaction
 - [ ] Add tests
 - [ ] Add documentation
 - [ ] Update Readme

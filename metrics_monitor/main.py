@@ -26,6 +26,9 @@ async def check_website(
         interval (int): The interval, in seconds, at which to check the website.
         regexp_pattern (str): The regular expression pattern to search for in the response content.
         conn (asyncpg.Connection): The connection to the database where website metrics will be stored.
+
+    Returns:
+        None
     """
     while True:
         try:
@@ -45,13 +48,13 @@ async def check_website(
                         f"{url} - response_time: {response_time} - status_code: {status_code} - pattern_found: {pattern_found}"
                     )
 
-                    await conn.execute(
-                        "INSERT INTO website_metrics (url, request_timestamp, response_time, status_code, pattern_found) VALUES ($1, $2, $3, $4, $5)",
+                    await save_metrics(
                         url,
                         start_time,
                         response_time,
                         status_code,
                         pattern_found,
+                        conn,
                     )
 
         except Exception as e:
@@ -60,29 +63,69 @@ async def check_website(
         await asyncio.sleep(interval)
 
 
+async def save_metrics(
+    url: str,
+    request_timestamp: datetime,
+    response_time: float,
+    status_code: int,
+    pattern_found: bool,
+    conn: asyncpg.Connection,
+):
+    """
+    Saves website metrics to the database.
+
+    Args:
+        url (str): The URL of the website.
+        request_timestamp (datetime): The timestamp of the request.
+        response_time (float): The response time of the request.
+        status_code (int): The HTTP status code of the response.
+        pattern_found (bool): Whether the expected pattern was found in the response.
+        conn (asyncpg.Connection): The database connection.
+
+    Returns:
+        None
+    """
+    await conn.execute(
+        """INSERT INTO website_metrics (url, request_timestamp, response_time, status_code, pattern_found) 
+        VALUES ($1, $2, $3, $4, $5)""",
+        url,
+        request_timestamp,
+        response_time,
+        status_code,
+        pattern_found,
+    )
+
+
 async def main(input_file: TextIO):
     """
     Asynchronously monitors website metrics by periodically sending HTTP requests to specified URLs and storing the
     response time, status code, and whether a specified pattern was found in the response. The monitoring parameters
     are read from a JSON file passed as an argument.
 
-    :param input_file: A file-like object containing a JSON array of monitoring parameters. Each parameter is a JSON
-                       object with the following keys:
-                       - url: The URL to monitor
-                       - interval: The interval between requests in seconds
-                       - regexp_pattern: A regular expression pattern to search for in the response body
+    Args:
+        input_file (TextIO): A file-like object containing a JSON array of monitoring parameters. Each parameter is a
+            JSON object with the following keys:
+            - url: The URL to monitor
+            - interval: The interval between requests in seconds
+            - regexp_pattern: A regular expression pattern to search for in the response body
+
+    Returns:
+        None
     """
 
-    pg_user = os.environ.get("POSTGRES_USER")
-    pg_password = os.environ.get("POSTGRES_PASSWORD")
-    pg_host = os.environ.get("POSTGRES_HOST")
-    pg_port = os.environ.get("POSTGRES_PORT")
-    pg_database = os.environ.get("POSTGRES_DATABASE")
-    dsn = f"postgresql://{pg_user}:{pg_password}@{pg_host}:{pg_port}/{pg_database}"
-    conn = await asyncpg.connect(dsn)
+    conn = await get_db_connection()
 
     await conn.execute(
-        "CREATE TABLE IF NOT EXISTS website_metrics (id serial primary key, url text, request_timestamp timestamptz, response_time float, status_code int, pattern_found boolean)"
+        """
+        CREATE TABLE IF NOT EXISTS website_metrics (
+            id serial primary key,
+            url text,
+            request_timestamp timestamptz,
+            response_time float,
+            status_code int,
+            pattern_found boolean
+        )
+        """
     )
 
     tasks = []
@@ -98,6 +141,25 @@ async def main(input_file: TextIO):
         )
 
     await asyncio.gather(*tasks)
+
+    await conn.close()
+
+
+async def get_db_connection() -> asyncpg.Connection:
+    """
+    Get a connection to the database where website metrics will be stored.
+
+    Returns:
+        asyncpg.Connection: The connection to the database where website metrics will be stored.
+    """
+    pg_user = os.environ.get("POSTGRES_USER")
+    pg_password = os.environ.get("POSTGRES_PASSWORD")
+    pg_host = os.environ.get("POSTGRES_HOST")
+    pg_port = os.environ.get("POSTGRES_PORT")
+    pg_database = os.environ.get("POSTGRES_DATABASE")
+    dsn = f"postgresql://{pg_user}:{pg_password}@{pg_host}:{pg_port}/{pg_database}"
+
+    return await asyncpg.connect(dsn)
 
 
 parser = argparse.ArgumentParser()
