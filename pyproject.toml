@@ -13,6 +13,13 @@ asyncpg = "^0.29.0"
 pydantic-settings = "^2.0.3"
 python-dotenv = "^1.0.0"
 
+[tool.poetry.group.test.dependencies]
+Faker = "^19.13.0"
+pytest = "^7.4.3"
+pytest-aiohttp = "^1.0.5"
+pytest-cov = "^4.1.0"
+pytest-mock = "^3.12.0"
+
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"

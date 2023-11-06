@@ -52,7 +52,7 @@ async def check_website(
                         await save_metrics(metrics, conn)
                     logging.info(f"Saved metrics to database: {metrics}.")
         except Exception as e:
-            logging.error(f"Error checking {monitor_params.url}: {str(e)}")
+            logging.error(f"Error checking {monitor_params.url}: {e}")
 
 
 async def prepare_website_metrics(
@@ -101,9 +101,9 @@ async def main(input_file: TextIO):
     Args:
         input_file (TextIO): A file-like object containing a JSON array of monitoring parameters. Each parameter is a
             JSON object with the following keys:
-            - url: The URL to monitor
-            - interval: The interval between requests in seconds
-            - regexp_pattern: A regular expression pattern to search for in the response body
+            - url (str): The URL to monitor
+            - interval (int): The interval between requests in seconds
+            - regexp_pattern (str | null): A regular expression pattern to search for in the response body
 
     Returns:
         None
@@ -113,13 +113,13 @@ async def main(input_file: TextIO):
 
     async with asyncpg.create_pool(
         settings["postgres_dsn"],
-        min_size=settings["pool_min_size"],
-        max_size=settings["pool_max_size"],
+        min_size=int(settings["pool_min_size"]),
+        max_size=int(settings["pool_max_size"]),
     ) as pool:
         async with pool.acquire() as conn:
             await create_table(conn)
 
-        sem = asyncio.Semaphore(settings["semaphore_max_concurrent"])
+        sem = asyncio.Semaphore(int(settings["semaphore_max_concurrent"]))
         monitoring_args = json.load(input_file)
         tasks = [
             check_website(
@@ -150,6 +150,6 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         print("Keyboard interrupt detected.")
     except Exception as e:
-        print(f"Error: {str(e)}")
+        print(f"Error: {e}")
     finally:
         print("Exiting...")
