@@ -6,6 +6,7 @@ the metrics into a PostgreSQL database.
 ## TODO
 - [x] Read from file
 - [x] Extract DB interaction
+- [x] Add synchronization
 - [ ] Add configuration
 - [ ] Add tests
 - [ ] Add documentation

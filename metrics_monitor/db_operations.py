@@ -1,24 +1,6 @@
-import os
 from datetime import datetime
 
 import asyncpg
-
-
-async def get_db_connection() -> asyncpg.Connection:
-    """
-    Get a connection to the database where website metrics will be stored.
-
-    Returns:
-        asyncpg.Connection: The connection to the database where website metrics will be stored.
-    """
-    pg_user = os.getenv("POSTGRES_USER")
-    pg_password = os.getenv("POSTGRES_PASSWORD")
-    pg_host = os.getenv("POSTGRES_HOST")
-    pg_port = os.getenv("POSTGRES_PORT")
-    pg_database = os.getenv("POSTGRES_DATABASE")
-    dsn = f"postgresql://{pg_user}:{pg_password}@{pg_host}:{pg_port}/{pg_database}"
-
-    return await asyncpg.connect(dsn)
 
 
 async def create_table(conn: asyncpg.Connection):
