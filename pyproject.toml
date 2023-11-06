@@ -10,6 +10,7 @@ packages = [{include = "metrics_monitor"}]
 python = "^3.11"
 aiohttp = {version = "^3.8.6", extras = ["speedups"]}
 asyncpg = "^0.29.0"
+pydantic-settings = "^2.0.3"
 python-dotenv = "^1.0.0"
 
 [build-system]

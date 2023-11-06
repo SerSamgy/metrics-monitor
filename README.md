@@ -7,7 +7,7 @@ the metrics into a PostgreSQL database.
 - [x] Read from file
 - [x] Extract DB interaction
 - [x] Add synchronization
-- [ ] Add configuration
+- [x] Add configuration
 - [ ] Add tests
 - [ ] Add documentation
 - [ ] Update Readme

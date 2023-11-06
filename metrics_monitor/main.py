@@ -2,7 +2,6 @@ import argparse
 import asyncio
 import json
 import logging
-import os
 import re
 from datetime import datetime
 from typing import TextIO
@@ -12,6 +11,7 @@ import asyncpg
 from dotenv import load_dotenv
 
 from metrics_monitor.db_operations import create_table, save_metrics
+from metrics_monitor.settings import Settings
 
 load_dotenv()
 
@@ -87,20 +87,17 @@ async def main(input_file: TextIO):
     Returns:
         None
     """
-    # TODO: move `dsn` to settings
-    pg_user = os.getenv("POSTGRES_USER")
-    pg_password = os.getenv("POSTGRES_PASSWORD")
-    pg_host = os.getenv("POSTGRES_HOST")
-    pg_port = os.getenv("POSTGRES_PORT")
-    pg_database = os.getenv("POSTGRES_DATABASE")
-    dsn = f"postgresql://{pg_user}:{pg_password}@{pg_host}:{pg_port}/{pg_database}"
+    settings = Settings().model_dump()
 
-    # TODO: add settings for `pool`
-    async with asyncpg.create_pool(dsn) as pool:
+    async with asyncpg.create_pool(
+        settings["postgres_dsn"],
+        min_size=settings["pool_min_size"],
+        max_size=settings["pool_max_size"],
+    ) as pool:
         async with pool.acquire() as conn:
             await create_table(conn)
 
-        sem = asyncio.Semaphore(10)
+        sem = asyncio.Semaphore(settings["semaphore_max_concurrent"])
         tasks = []
         monitoring_args = json.load(input_file)
         for args in monitoring_args:
