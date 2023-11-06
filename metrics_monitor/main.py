@@ -10,6 +10,10 @@ import aiohttp
 import asyncpg
 
 from metrics_monitor.db_operations import create_table, save_metrics
+from metrics_monitor.errors import (
+    ConfigDeserializationError,
+    SettingsInitializationError,
+)
 from metrics_monitor.models import MonitorParams, WebsiteMetrics
 from metrics_monitor.settings import Settings
 
@@ -51,8 +55,14 @@ async def check_website(
                     async with sem, pool.acquire() as conn:
                         await save_metrics(metrics, conn)
                     logging.info(f"Saved metrics to database: {metrics}.")
+        # each exception is logged and the loop continues; however it might be better to integrate
+        # with a monitoring system like Sentry to notify the developer if a large number of tasks are failing
+        except aiohttp.ClientError as e:
+            logging.error(f"Network error checking {monitor_params.url}: {e}")
+        except asyncpg.PostgresError as e:
+            logging.error(f"Database error checking {monitor_params.url}: {e}")
         except Exception as e:
-            logging.error(f"Error checking {monitor_params.url}: {e}")
+            logging.error(f"Unexpected error checking {monitor_params.url}: {e}")
 
 
 async def prepare_website_metrics(
@@ -68,7 +78,7 @@ async def prepare_website_metrics(
         response (aiohttp.ClientResponse): The response object to extract metrics from.
         start_time (datetime): The time the request was sent.
         url (str): The URL of the website being monitored.
-        regexp_pattern (str): The regular expression pattern to search for in the response content.
+        regexp_pattern (str | None): The regular expression pattern to search for in the response content.
 
     Returns:
         WebsiteMetrics: An object containing the extracted website metrics.
@@ -77,6 +87,7 @@ async def prepare_website_metrics(
     response_time = (datetime.now() - start_time).total_seconds()
     status_code = response.status
     content = await response.text()
+    logging.debug(f"Response content for {url}: {content}")
 
     pattern_found = False
     if regexp_pattern:
@@ -109,7 +120,10 @@ async def main(input_file: TextIO):
         None
     """
 
-    settings = Settings().model_dump()
+    try:
+        settings = Settings().model_dump()
+    except Exception as e:
+        raise SettingsInitializationError(e) from e
 
     async with asyncpg.create_pool(
         settings["postgres_dsn"],
@@ -120,7 +134,11 @@ async def main(input_file: TextIO):
             await create_table(conn)
 
         sem = asyncio.Semaphore(int(settings["semaphore_max_concurrent"]))
-        monitoring_args = json.load(input_file)
+        try:
+            monitoring_args = json.load(input_file)
+        except Exception as e:
+            raise ConfigDeserializationError(e) from e
+
         tasks = [
             check_website(
                 MonitorParams(
@@ -149,7 +167,13 @@ if __name__ == "__main__":
         asyncio.run(main(args.config))
     except KeyboardInterrupt:
         print("Keyboard interrupt detected.")
+    except SettingsInitializationError as e:
+        print(e)
+    except ConfigDeserializationError as e:
+        print(e)
+    except asyncpg.PostgresError as e:
+        print(f"Database error: {e}")
     except Exception as e:
-        print(f"Error: {e}")
+        print(f"Unexpected error: {e}")
     finally:
         print("Exiting...")
