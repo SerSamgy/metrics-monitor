@@ -8,5 +8,9 @@
         "url": "https://archives.fedoraproject.org/pub/fedora/linux/releases/",
         "interval": 20,
         "regexp_pattern": "38"
+    },
+    {
+        "url": "https://nixos.org/manual/nixos/stable/",
+        "interval": 30
     }
 ]

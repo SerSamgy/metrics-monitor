@@ -10,25 +10,19 @@ import aiohttp
 import asyncpg
 
 from metrics_monitor.db_operations import create_table, save_metrics
-from metrics_monitor.models import WebsiteMetrics
+from metrics_monitor.models import MonitorParams, WebsiteMetrics
 from metrics_monitor.settings import Settings
 
 
 async def check_website(
-    url: str,
-    interval: int,
-    regexp_pattern: str,
-    pool: asyncpg.pool.Pool,
-    sem: asyncio.Semaphore,
+    monitor_params: MonitorParams, pool: asyncpg.pool.Pool, sem: asyncio.Semaphore
 ):
     """
     Check the given website at a specified interval and log the response time, status code, and whether a given regular
     expression pattern was found in the response content.
 
     Args:
-        url (str): The URL of the website to check.
-        interval (int): The interval, in seconds, at which to check the website.
-        regexp_pattern (str): The regular expression pattern to search for in the response content.
+        monitor_params (MonitorParams): An object containing the monitoring parameters for the website.
         pool (asyncpg.pool.Pool): The connection pool to the database where website metrics will be stored.
         sem (asyncio.Semaphore): The semaphore to limit the number of concurrent database connections.
 
@@ -36,31 +30,36 @@ async def check_website(
         None
     """
 
-    await asyncio.sleep(interval)
-
     while True:
+        await asyncio.sleep(monitor_params.interval)
+
         try:
             async with aiohttp.ClientSession() as session:
                 start_time = datetime.now()
-                async with session.get(url) as response:
+                async with session.get(monitor_params.url) as response:
                     metrics = await prepare_website_metrics(
-                        response, start_time, url, regexp_pattern
+                        response,
+                        start_time,
+                        monitor_params.url,
+                        monitor_params.regexp_pattern,
                     )
                     logging.info(
-                        f"{url} - response_time: {metrics.response_time} - status_code: {metrics.status_code} - pattern_found: {metrics.pattern_found}"
+                        f"{monitor_params.url} - response_time: {metrics.response_time} "
+                        f"- status_code: {metrics.status_code} - pattern_found: {metrics.pattern_found}"
                     )
 
                     async with sem, pool.acquire() as conn:
                         await save_metrics(metrics, conn)
+                    logging.info(f"Saved metrics to database: {metrics}.")
         except Exception as e:
-            logging.error(f"Error checking {url}: {str(e)}")
+            logging.error(f"Error checking {monitor_params.url}: {str(e)}")
 
 
 async def prepare_website_metrics(
     response: aiohttp.ClientResponse,
     start_time: datetime,
     url: str,
-    regexp_pattern: str,
+    regexp_pattern: str | None,
 ) -> WebsiteMetrics:
     """
     Extracts website metrics from an aiohttp response object.
@@ -78,10 +77,11 @@ async def prepare_website_metrics(
     response_time = (datetime.now() - start_time).total_seconds()
     status_code = response.status
     content = await response.text()
-    if re.search(regexp_pattern, content):
-        pattern_found = True
-    else:
-        pattern_found = False
+
+    pattern_found = False
+    if regexp_pattern:
+        if re.search(regexp_pattern, content):
+            pattern_found = True
 
     return WebsiteMetrics(
         url=url,
@@ -110,7 +110,6 @@ async def main(input_file: TextIO):
     """
 
     settings = Settings().model_dump()
-    print(f"{settings=}")
 
     async with asyncpg.create_pool(
         settings["postgres_dsn"],
@@ -121,19 +120,19 @@ async def main(input_file: TextIO):
             await create_table(conn)
 
         sem = asyncio.Semaphore(settings["semaphore_max_concurrent"])
-        tasks = []
         monitoring_args = json.load(input_file)
-        for args in monitoring_args:
-            tasks.append(
-                check_website(
-                    args["url"],
-                    args["interval"],
-                    args["regexp_pattern"],
-                    pool,
-                    sem,
-                )
+        tasks = [
+            check_website(
+                MonitorParams(
+                    url=args["url"],
+                    interval=args["interval"],
+                    regexp_pattern=args.get("regexp_pattern"),
+                ),
+                pool,
+                sem,
             )
-
+            for args in monitoring_args
+        ]
         await asyncio.gather(*tasks)
 
 
