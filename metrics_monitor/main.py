@@ -8,12 +8,10 @@ from typing import TextIO
 
 import aiohttp
 import asyncpg
-from dotenv import load_dotenv
 
 from metrics_monitor.db_operations import create_table, save_metrics
+from metrics_monitor.models import WebsiteMetrics
 from metrics_monitor.settings import Settings
-
-load_dotenv()
 
 
 async def check_website(
@@ -37,6 +35,7 @@ async def check_website(
     Returns:
         None
     """
+
     await asyncio.sleep(interval)
 
     while True:
@@ -44,31 +43,53 @@ async def check_website(
             async with aiohttp.ClientSession() as session:
                 start_time = datetime.now()
                 async with session.get(url) as response:
-                    response_time = (datetime.now() - start_time).total_seconds()
-                    status_code = response.status
-                    content = await response.text()
-
-                    if re.search(regexp_pattern, content):
-                        pattern_found = True
-                    else:
-                        pattern_found = False
-
+                    metrics = await prepare_website_metrics(
+                        response, start_time, url, regexp_pattern
+                    )
                     logging.info(
-                        f"{url} - response_time: {response_time} - status_code: {status_code} - pattern_found: {pattern_found}"
+                        f"{url} - response_time: {metrics.response_time} - status_code: {metrics.status_code} - pattern_found: {metrics.pattern_found}"
                     )
 
                     async with sem, pool.acquire() as conn:
-                        await save_metrics(
-                            url,
-                            start_time,
-                            response_time,
-                            status_code,
-                            pattern_found,
-                            conn,
-                        )
-
+                        await save_metrics(metrics, conn)
         except Exception as e:
             logging.error(f"Error checking {url}: {str(e)}")
+
+
+async def prepare_website_metrics(
+    response: aiohttp.ClientResponse,
+    start_time: datetime,
+    url: str,
+    regexp_pattern: str,
+) -> WebsiteMetrics:
+    """
+    Extracts website metrics from an aiohttp response object.
+
+    Args:
+        response (aiohttp.ClientResponse): The response object to extract metrics from.
+        start_time (datetime): The time the request was sent.
+        url (str): The URL of the website being monitored.
+        regexp_pattern (str): The regular expression pattern to search for in the response content.
+
+    Returns:
+        WebsiteMetrics: An object containing the extracted website metrics.
+    """
+
+    response_time = (datetime.now() - start_time).total_seconds()
+    status_code = response.status
+    content = await response.text()
+    if re.search(regexp_pattern, content):
+        pattern_found = True
+    else:
+        pattern_found = False
+
+    return WebsiteMetrics(
+        url=url,
+        request_timestamp=start_time,
+        response_time=response_time,
+        status_code=status_code,
+        pattern_found=pattern_found,
+    )
 
 
 async def main(input_file: TextIO):
@@ -87,7 +108,9 @@ async def main(input_file: TextIO):
     Returns:
         None
     """
+
     settings = Settings().model_dump()
+    print(f"{settings=}")
 
     async with asyncpg.create_pool(
         settings["postgres_dsn"],
