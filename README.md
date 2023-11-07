@@ -9,7 +9,6 @@ the metrics into a PostgreSQL database.
 - [x] Add synchronization
 - [x] Add configuration
 - [x] Add models
-- [ ] Change pattern matching
 - [ ] Add tests
 - [ ] Add documentation
 - [ ] Update Readme

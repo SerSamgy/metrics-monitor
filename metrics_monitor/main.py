@@ -22,6 +22,26 @@ async def check_website(
     monitor_params: MonitorParams, pool: asyncpg.pool.Pool, sem: asyncio.Semaphore
 ):
     """
+    Periodically checks the website specified in `monitor_params` for availability and metrics.
+
+    Args:
+        monitor_params (MonitorParams): The parameters for the website to monitor.
+        pool (asyncpg.pool.Pool): The connection pool to use for database operations.
+        sem (asyncio.Semaphore): The semaphore to use for rate limiting.
+
+    Returns:
+        None
+    """
+
+    while True:
+        await asyncio.sleep(monitor_params.interval)
+        await check_website_once(monitor_params, pool, sem)
+
+
+async def check_website_once(
+    monitor_params: MonitorParams, pool: asyncpg.pool.Pool, sem: asyncio.Semaphore
+):
+    """
     Check the given website at a specified interval and log the response time, status code, and whether a given regular
     expression pattern was found in the response content.
 
@@ -34,35 +54,32 @@ async def check_website(
         None
     """
 
-    while True:
-        await asyncio.sleep(monitor_params.interval)
+    try:
+        async with aiohttp.ClientSession() as session:
+            start_time = datetime.now()
+            async with session.get(monitor_params.url) as response:
+                metrics = await prepare_website_metrics(
+                    response,
+                    start_time,
+                    monitor_params.url,
+                    monitor_params.regexp_pattern,
+                )
+                logging.info(
+                    f"{monitor_params.url} - response_time: {metrics.response_time} "
+                    f"- status_code: {metrics.status_code} - pattern_found: {metrics.pattern_found}"
+                )
 
-        try:
-            async with aiohttp.ClientSession() as session:
-                start_time = datetime.now()
-                async with session.get(monitor_params.url) as response:
-                    metrics = await prepare_website_metrics(
-                        response,
-                        start_time,
-                        monitor_params.url,
-                        monitor_params.regexp_pattern,
-                    )
-                    logging.info(
-                        f"{monitor_params.url} - response_time: {metrics.response_time} "
-                        f"- status_code: {metrics.status_code} - pattern_found: {metrics.pattern_found}"
-                    )
-
-                    async with sem, pool.acquire() as conn:
-                        await save_metrics(metrics, conn)
-                    logging.info(f"Saved metrics to database: {metrics}.")
-        # each exception is logged and the loop continues; however it might be better to integrate
-        # with a monitoring system like Sentry to notify the developer if a large number of tasks are failing
-        except aiohttp.ClientError as e:
-            logging.error(f"Network error checking {monitor_params.url}: {e}")
-        except asyncpg.PostgresError as e:
-            logging.error(f"Database error checking {monitor_params.url}: {e}")
-        except Exception as e:
-            logging.error(f"Unexpected error checking {monitor_params.url}: {e}")
+                async with sem, pool.acquire() as conn:
+                    await save_metrics(metrics, conn)
+                logging.info(f"Saved metrics to database: {metrics}.")
+    # each exception is logged and the loop continues; however it might be better to integrate
+    # with a monitoring system like Sentry to notify the developer if a large number of tasks are failing
+    except aiohttp.ClientError as e:
+        logging.error(f"Network error checking {monitor_params.url}: {e}")
+    except asyncpg.PostgresError as e:
+        logging.error(f"Database error checking {monitor_params.url}: {e}")
+    except Exception as e:
+        logging.error(f"Unexpected error checking {monitor_params.url}: {e}")
 
 
 async def prepare_website_metrics(
