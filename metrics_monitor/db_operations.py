@@ -42,6 +42,7 @@ async def save_metrics(metrics: WebsiteMetrics, conn: asyncpg.Connection):
         """INSERT INTO website_metrics (url, request_timestamp, response_time, status_code, pattern_found) 
         VALUES ($1, $2, $3, $4, $5)""",
         metrics.url,
+        # must be saved in UTC
         metrics.request_timestamp,
         metrics.response_time,
         metrics.status_code,
