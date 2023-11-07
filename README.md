@@ -47,3 +47,20 @@ Before you begin, ensure you have met the following requirements:
    ```
 
    As a reference, you can use the `websites.json` file in the root of the project.
+
+
+## Testing
+
+Before running tests, make sure you have installed the dependencies with `poetry install --with test`. Also make sure that you have a running instance of `PostgreSQL` database and prepared a `.env.test` file out of the `.env.test.default` one with correct settings.
+
+To run tests, run the following command in the root of the project
+
+```shell
+poetry run pytest
+```
+
+To run tests with coverage with report in terminal, run the following command in the root of the project
+
+```shell
+poetry run pytest --cov-report term-missing --cov-branch --cov=metrics_monitor/ tests/
+```
