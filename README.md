@@ -10,5 +10,5 @@ the metrics into a PostgreSQL database.
 - [x] Add configuration
 - [x] Add models
 - [x] Add tests
-- [ ] Add documentation
+- [x] Add documentation
 - [ ] Update Readme

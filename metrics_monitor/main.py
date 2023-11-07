@@ -4,7 +4,7 @@ import json
 import logging
 import re
 from datetime import datetime
-from typing import TextIO
+from typing import Any, Coroutine, TextIO
 
 import aiohttp
 import asyncpg
@@ -73,7 +73,9 @@ async def check_website_once(
                     await save_metrics(metrics, conn)
                 logging.info(f"Saved metrics to database: {metrics}.")
     # each exception is logged and the loop continues; however it might be better to integrate
-    # with a monitoring system like Sentry to notify the developer if a large number of tasks are failing
+    # with a monitoring system like Sentry to notify the developer if a large number of tasks are failing;
+    # additionally, it might be beneficial to add a retry mechanism for failed requests a certain number of times
+    # before logging the error and continuing
     except aiohttp.ClientError as e:
         logging.error(f"Network error checking {monitor_params.url}: {e}")
     except asyncpg.PostgresError as e:
@@ -158,6 +160,10 @@ async def main(input_file: TextIO):
 
         tasks = [
             check_website(
+                # validation errors occured during initialization of MonitorParams will be propagated to the caller
+                # and caught as basic exceptions,
+                # however it might be better to move the validation logic before the tasks are created to inform
+                # the caller before their execution with a more specific exception
                 MonitorParams(
                     url=args["url"],
                     interval=args["interval"],
@@ -178,10 +184,14 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
+    # logging is configured here instead of in a separate file for simplicity;
+    # for production use, it would be better to log not only to stdout but also to files,
+    # especially for errors and warnings, and/or to a monitoring system like Sentry
     logging.basicConfig(level=logging.INFO)
     print("Starting execution of scheduled tasks.")
     try:
         asyncio.run(main(args.config))
+    # for production use, it would be better to handle other signals besides KeyboardInterrupt
     except KeyboardInterrupt:
         print("Keyboard interrupt detected.")
     except SettingsInitializationError as e:
