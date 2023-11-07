@@ -4,7 +4,7 @@ import json
 import logging
 import re
 from datetime import datetime
-from typing import Any, Coroutine, TextIO
+from typing import TextIO
 
 import aiohttp
 import asyncpg
