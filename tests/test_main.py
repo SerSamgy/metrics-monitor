@@ -1,6 +1,7 @@
 import asyncio
 import random
 from datetime import datetime
+from unittest import mock
 from unittest.mock import patch
 
 import aiohttp
@@ -8,7 +9,7 @@ import asyncpg
 import pytest
 from freezegun import freeze_time
 
-from metrics_monitor.main import check_website_once
+from metrics_monitor.main import check_website_once, prepare_website_metrics
 from metrics_monitor.models import MonitorParams
 
 
@@ -89,6 +90,33 @@ async def test_check_website_once_exception(
 
     row = await db_conn.fetchrow("SELECT * FROM website_metrics")
     assert row is None
+
+
+@pytest.mark.parametrize(
+    "regexp_pattern, response_body, expected_pattern_found",
+    [
+        (None, "Example", False),
+        (r"Health: \d{2,3}%", "Health: 50%", True),
+        (r"Health: \d{2,3}%", "Example", False),
+    ],
+)
+@freeze_time("2023-11-07 11:00:01")
+@pytest.mark.asyncio
+async def test_prepare_website_metrics(
+    regexp_pattern, response_body, expected_pattern_found, mocked_response, faker
+):
+    url = faker.url()
+    request_timestamp = datetime.now()
+    mocked_response._text = response_body
+    metrics = await prepare_website_metrics(
+        mocked_response, request_timestamp, url, regexp_pattern
+    )
+
+    assert metrics.url == url
+    assert metrics.request_timestamp == request_timestamp
+    assert metrics.response_time == 0.0
+    assert metrics.status_code == mocked_response.status
+    assert metrics.pattern_found == expected_pattern_found
 
 
 @pytest.fixture
