@@ -109,9 +109,8 @@ async def prepare_website_metrics(
     logging.debug(f"Response content for {url}: {content}")
 
     pattern_found = False
-    if regexp_pattern:
-        if re.search(regexp_pattern, content):
-            pattern_found = True
+    if regexp_pattern and re.search(regexp_pattern, content):
+        pattern_found = True
 
     return WebsiteMetrics(
         url=url,
