@@ -37,10 +37,11 @@ class MockResponse:
 @freeze_time("2023-11-07 11:00:01")
 @pytest.mark.asyncio
 async def test_check_website_once_successful(
-    fake_monitor_params, semaphore, db_pool, db_conn
+    fake_monitor_params, mocked_response, semaphore, db_pool, db_conn
 ):
-    resp = MockResponse("Health: 100%", 200)
-    with patch("metrics_monitor.main.aiohttp.ClientSession.get", return_value=resp):
+    with patch(
+        "metrics_monitor.main.aiohttp.ClientSession.get", return_value=mocked_response
+    ):
         await check_website_once(fake_monitor_params, db_pool, semaphore)
 
     row = await db_conn.fetchrow("SELECT * FROM website_metrics")
