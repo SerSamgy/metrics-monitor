@@ -36,12 +36,8 @@ class MockResponse:
 
 @freeze_time("2023-11-07 11:00:01")
 @pytest.mark.asyncio
-async def test_check_website_once_successful(
-    fake_monitor_params, mocked_response, semaphore, db_pool, db_conn
-):
-    with patch(
-        "metrics_monitor.main.aiohttp.ClientSession.get", return_value=mocked_response
-    ):
+async def test_check_website_once_successful(fake_monitor_params, mocked_response, semaphore, db_pool, db_conn):
+    with patch("metrics_monitor.main.aiohttp.ClientSession.get", return_value=mocked_response):
         await check_website_once(fake_monitor_params, db_pool, semaphore)
 
     row = await db_conn.fetchrow("SELECT * FROM website_metrics")
@@ -49,13 +45,11 @@ async def test_check_website_once_successful(
     assert row["request_timestamp"] == datetime(2023, 11, 7, 11, 0, 1)
     assert row["response_time"] == 0.0
     assert row["status_code"] == 200
-    assert row["pattern_found"] == True
+    assert row["pattern_found"] is True
 
 
 @pytest.mark.asyncio
-async def test_check_website_once_clienterror(
-    fake_monitor_params, semaphore, db_pool, db_conn
-):
+async def test_check_website_once_clienterror(fake_monitor_params, semaphore, db_pool, db_conn):
     with patch(
         "metrics_monitor.main.aiohttp.ClientSession.get",
         side_effect=aiohttp.ClientError,
@@ -67,12 +61,8 @@ async def test_check_website_once_clienterror(
 
 
 @pytest.mark.asyncio
-async def test_check_website_once_postgreserror(
-    fake_monitor_params, semaphore, mocked_response, db_pool, db_conn
-):
-    with patch(
-        "metrics_monitor.main.aiohttp.ClientSession.get", return_value=mocked_response
-    ), patch(
+async def test_check_website_once_postgreserror(fake_monitor_params, semaphore, mocked_response, db_pool, db_conn):
+    with patch("metrics_monitor.main.aiohttp.ClientSession.get", return_value=mocked_response), patch(
         "metrics_monitor.main.save_metrics",
         side_effect=asyncpg.FatalPostgresError("oops"),
     ):
@@ -83,12 +73,8 @@ async def test_check_website_once_postgreserror(
 
 
 @pytest.mark.asyncio
-async def test_check_website_once_exception(
-    fake_monitor_params, semaphore, mocked_response, db_pool, db_conn
-):
-    with patch(
-        "metrics_monitor.main.aiohttp.ClientSession.get", return_value=mocked_response
-    ), patch(
+async def test_check_website_once_exception(fake_monitor_params, semaphore, mocked_response, db_pool, db_conn):
+    with patch("metrics_monitor.main.aiohttp.ClientSession.get", return_value=mocked_response), patch(
         "metrics_monitor.main.save_metrics",
         side_effect=Exception("oops"),
     ):
@@ -108,15 +94,11 @@ async def test_check_website_once_exception(
 )
 @freeze_time("2023-11-07 11:00:01")
 @pytest.mark.asyncio
-async def test_prepare_website_metrics(
-    regexp_pattern, response_body, expected_pattern_found, mocked_response, faker
-):
+async def test_prepare_website_metrics(regexp_pattern, response_body, expected_pattern_found, mocked_response, faker):
     url = faker.url()
     request_timestamp = datetime.now()
     mocked_response._text = response_body
-    metrics = await prepare_website_metrics(
-        mocked_response, request_timestamp, url, regexp_pattern
-    )
+    metrics = await prepare_website_metrics(mocked_response, request_timestamp, url, regexp_pattern)
 
     assert metrics.url == url
     assert metrics.request_timestamp == request_timestamp
@@ -127,9 +109,9 @@ async def test_prepare_website_metrics(
 
 @pytest.mark.asyncio
 async def test_main_settings_error(input_file_content):
-    with patch(
-        "metrics_monitor.main.Settings", side_effect=ValueError("oops")
-    ), pytest.raises(SettingsInitializationError):
+    with patch("metrics_monitor.main.Settings", side_effect=ValueError("oops")), pytest.raises(
+        SettingsInitializationError
+    ):
         await main(input_file_content)
 
 
@@ -141,9 +123,7 @@ async def test_main_config_deserialization_error():
 
 @pytest.mark.asyncio
 async def test_main_successful(input_file_content):
-    with patch(
-        "metrics_monitor.main.check_website", return_value=AsyncMock()
-    ) as mocked_check_website:
+    with patch("metrics_monitor.main.check_website", return_value=AsyncMock()) as mocked_check_website:
         await main(input_file_content)
 
     mocked_check_website.assert_awaited()
